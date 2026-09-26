@@ -4,7 +4,7 @@ The github-metadata-generator. It turns a routing decision and its current resol
 
 ## Labels
 
-Labels serve filtering, automation and a quick read; everything else lives in the block. The router owns exactly the labels in this table, by full name, and keeps one profile, one workflow and one risk label on a ready issue. A label outside the table stays untouched even when it shares a prefix (`risk:compliance`, `ai:workflow:manual`).
+Labels serve filtering, automation and a quick read; everything else lives in the block. The router owns the fixed labels in this table, by full name, and the tie labels, by their `ai:tie:impl:` and `ai:tie:review:` prefixes; it keeps one profile, one workflow and one risk label on a ready issue. Any other label stays untouched even when it shares a prefix (`risk:compliance`, `ai:workflow:manual`).
 
 | Label | Set when | Color |
 |---|---|---|
@@ -25,11 +25,13 @@ Labels serve filtering, automation and a quick read; everything else lives in th
 | `risk:high` | `risk.overall` high | `D93F0B` |
 | `risk:critical` | `risk.overall` critical | `B60205` |
 | `ai:needs-refinement` | the readiness gate failed | `EDEDED` |
+| `ai:tie:impl:<model-id>` | the implementation's tie survived every rule: one label per tied candidate | `F9D0C4` |
+| `ai:tie:review:<model-id>` | the review's tie survived every rule: one label per tied candidate | `F9D0C4` |
 
-- **Ready**: its profile, workflow and risk labels from the table; every other table label comes off, `ai:needs-refinement` included.
-- **Needs refinement**: `ai:needs-refinement` only; every other table label comes off, since the issue has no execution profile yet.
-- The review profile, efforts, dimensions and model names stay in the block. A model name is never a label: labels persist, models change.
-- A missing label is created on first use, with the color above and its "Set when" text as description.
+- **Ready**: its profile, workflow and risk labels, plus one tie label per tied candidate of the current resolution; every other router label comes off, `ai:needs-refinement` and the tie labels of a tie that no longer stands included.
+- **Needs refinement**: `ai:needs-refinement` only; every other router label comes off, since the issue has no execution profile yet.
+- The review profile, efforts, dimensions and resolved models stay in the block. A resolved model is never a label: labels persist, models change. Tie labels are the exception: they show the choice left to the user where the issue gets picked up, belong to the current resolution like the block's model section, and every run replaces them.
+- A missing label is created on first use, with the color above and its "Set when" text as description; a tie label's description is `Tied for <implementation|review>: pick one at execution`. GitHub caps a label name at 50 characters: a tie label that would exceed it is left off, and the summary names the candidate.
 
 ## Issue block
 
@@ -91,7 +93,16 @@ Review:
 <!-- ai-execution-router:end -->
 ```
 
-A phase that could not be resolved shows `- Unresolved: <reason in one line>` instead of provider and model.
+A phase that could not be resolved shows `- Unresolved: <reason in one line>` instead of provider and model. A tied phase shows its candidates instead:
+
+```markdown
+Review:
+- Tie: pick one at execution
+  - <provider> / <model-id>, reasoning <native value, or "provider default">
+  - <provider> / <model-id>, reasoning <native value, or "provider default">
+```
+
+When the implementation's tied candidates overlap the review's, the review's tie line ends with `; prefer one other than the implementation's pick`.
 
 Needs refinement:
 

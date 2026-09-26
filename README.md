@@ -319,8 +319,7 @@ flowchart TD
     T -->|"no"| PICK["Pick, with resolved_reasoning"]
     T -->|"yes"| TC["Tie chain<br/>evidence layers, effort control if preferred,<br/>user preference, incumbent, lower price"]
     TC -->|"decided"| PICK
-    TC -->|"unbroken"| Q["Ask the user<br/>answer valid for this run only"]
-    Q --> PICK
+    TC -->|"unbroken"| TIE["Tied candidates<br/>one tie label each, picked at execution"]
 ```
 
 ### Evidence
@@ -366,33 +365,34 @@ Implementation is resolved first, then review, each on its own, so an efficient 
 
 A tie is broken, in order, by: ranking confidence; secondary-category confidence; specialization confidence; the model that honors the requested effort (only when effort control is `preferred`); the user's preference; the incumbent; the lower list price. A criterion is skipped when a candidate has no value for it, so an unknown value never counts as worse; `user_preference: null` is a value and means "not preferred".
 
-A tie that survives every rule is **the user's decision**. Registry order and provider carry no weight. Choosing a model to settle one tie and stating a standing preference are different things:
+A tie that survives every rule is **the user's decision**. Registry order and provider carry no weight. The router does not stop to ask: it lists every tied model in the resolution and puts one tie label per model on the issue (`ai:tie:review:<model-a>`, `ai:tie:review:<model-b>`), so whoever picks the issue up chooses which one runs. A run with nobody watching behaves the same way.
 
-| | Settling a tie | Stating a preference |
+A tie and a standing preference are different things:
+
+| | A tie | A preference |
 |---|---|---|
-| How it starts | the router asks which tied model to use | the user says so explicitly, e.g. "on ties, prefer <provider>" |
-| Recorded as | `tie_resolution: { source: user-selection, scope: execution }` on the phase | `user_preference: { preferred: true }` on the matching candidates in the registry |
-| Lasts | this run only; every issue in the batch with the same tie reuses it | until changed |
-| Next run | asks again | decides the tie without asking |
+| How it starts | a tie survives every rule | the user says so explicitly, e.g. "on ties, prefer <provider>" |
+| Recorded as | `tied_candidates` on the phase, one `ai:tie:<phase>:<model-id>` label per candidate | `user_preference: { preferred: true }` on the matching candidates in the registry |
+| Who chooses | whoever executes the issue, among the labeled models | the registry, on every later tie |
+| Next run | lists the same candidates while the tie stands | decides the tie, no tie labels |
 
 ```mermaid
 sequenceDiagram
     participant U as User
     participant R as Router
+    participant I as Issue
     participant G as Registry
-    Note over R: Run 1, issues 12 and 13
-    R->>U: Review tie, model A or model B?
-    U->>R: Model B
-    R->>R: Issues 12 and 13 use B for this run
+    Note over R: Run 1, issue 12, review tie between A and B
+    R->>I: Labels ai:tie:review:A and ai:tie:review:B
     Note over G: Unchanged, user_preference stays null
-    Note over R: Run 2, issue 14
-    R->>U: Same tie, model A or model B?
+    U->>I: Picks B when executing the issue
+    Note over U,R: Later, the user states a preference
     U->>R: On ties, prefer the provider of B
     R->>G: user_preference preferred on that provider's candidates
-    Note over R: Run 3 and later, B wins the tie without a question
+    Note over R: Next run, B wins the tie and the tie labels come off
 ```
 
-With no user to ask (an autonomous run), the phase stays `unresolved` with the reason `unbroken-tie: <models>`.
+When the implementation is tied too, the review stays tied as well, and you prefer a review model other than the one you picked for implementation.
 
 ## What gets written to GitHub
 
@@ -406,8 +406,9 @@ Labels are for filtering and automation. Everything else lives in the issue bloc
 | Workflow | `ai:workflow:<name>` for tdd, implement, bugfix, investigation, refactor, architecture, review, refinement |
 | Risk | `risk:low`, `risk:medium`, `risk:high`, `risk:critical` |
 | Gate | `ai:needs-refinement` |
+| Tie (only when a tie survives every rule) | `ai:tie:impl:<model-id>`, `ai:tie:review:<model-id>`, one per tied model |
 
-The router owns exactly these labels, by full name. A label outside the list stays untouched, even with a shared prefix (`risk:compliance`). A model name is never a label: labels persist, models change. Missing labels are created on first use.
+The router owns exactly these labels: the fixed ones by full name, the tie labels by their `ai:tie:impl:` and `ai:tie:review:` prefixes. Any other label stays untouched, even with a shared prefix (`risk:compliance`). A resolved model is never a label: labels persist, models change. Tie labels are the exception, because they show a choice left to you; every run replaces them. Missing labels are created on first use.
 
 ### The issue block
 
@@ -584,7 +585,7 @@ The run ends at the summary. Implementing the issue is a separate request.
 ## Current status and limitations
 
 - **Not yet run against a real repository.** The rules were checked with scripted scenarios (classification, eligibility, ties, freshness, promotion, GitHub parsing and labels) and blind readings of the documents.
-- **Nothing is measured yet.** Every role mapping in the registry rests on official documentation (`unevaluated`). Three roles (`balanced`, `frontier-verifier`, `deep-autonomous`) are tied between providers, so a run that needs them will ask you to choose, once per run, until you evaluate them or state a preference.
+- **Nothing is measured yet.** Every role mapping in the registry rests on official documentation (`unevaluated`). Three roles (`balanced`, `frontier-verifier`, `deep-autonomous`) are tied between providers, so an issue that needs them gets both models as tie labels and you pick one at execution, until you evaluate them or state a preference.
 - **The registry is a snapshot** from 2026-09-26 with two providers. The first run after a week refreshes it from official sources.
 - **No automated evaluation runner.** The agent follows the evaluation procedure itself.
 - **The generic pack alone reaches medium confidence at most** (each role has fewer than six cases), so it can recommend a promotion but never apply one automatically.

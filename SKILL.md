@@ -156,7 +156,7 @@ Done when the registry is within its TTL, or the refresh failed and the warning 
 
 ### 7. Resolve models
 
-Per ready issue, with the strategy from step 0. Read [`RESOLVER.md`](RESOLVER.md). Resolve implementation, then review, and emit `resolved_with` after the decision. An unbroken tie is asked once per run; the answer serves every issue in the batch that meets the same tie, and ends with the run.
+Per ready issue, with the strategy from step 0. Read [`RESOLVER.md`](RESOLVER.md). Resolve implementation, then review, and emit `resolved_with` after the decision. An unbroken tie is never asked during the run: the phase keeps every tied candidate, the issue gets one tie label per candidate, and the user picks one when executing the issue.
 
 ```yaml
 resolved_with:
@@ -187,11 +187,22 @@ resolved_with:
   warnings: []
 ```
 
-A phase also carries `tie_broken_by` when a tie-break decided it, `tie_resolution: { source: user-selection, scope: execution }` when the user's choice settled an unbroken tie for this run, and `speed_evidence: insufficient` or `cost_evidence: insufficient` when its ranking needed that data and lacked a comparable value.
+A phase also carries `tie_broken_by` when a tie-break decided it, and `speed_evidence: insufficient` or `cost_evidence: insufficient` when its ranking needed that data and lacked a comparable value. A phase whose tie survived every rule carries `tied_candidates` in place of `provider`, `model` and `resolved_reasoning`:
+
+```yaml
+  review:
+    tied_candidates:
+      - { provider: <provider>, model: <model-id>, resolved_reasoning: { provider_effort: high, status: supported } }
+      - { provider: <provider>, model: <model-id>, resolved_reasoning: { provider_effort: high, status: supported } }
+    requested_effort: high
+    effort_control_requirement: required
+    confidence: medium
+    confidence_basis: global
+```
 
 `resolved_with` is audit metadata. The issue shows it as the current model resolution, replaced on every run, and it travels with the execution (PR, run log); the routing decision is what persists.
 
-Done when each phase carries provider, model, requested effort, resolved reasoning and confidence, or `unresolved` with its reason.
+Done when each phase carries provider, model, requested effort, resolved reasoning and confidence, its tied candidates, or `unresolved` with its reason.
 
 ### 8. Write GitHub metadata
 
@@ -222,7 +233,7 @@ Missing information:
 - Retry behavior is unclear.
 ```
 
-Add a line only when the user must act: an unbroken tie waiting for the user's choice, a write that failed, a resolved model near retirement. The rest of `resolved_with` stays in the issue.
+A tied phase names its candidates joined by "or" (`Current resolution: <model> or <model> (tie, pick at execution)`). Add a line only when the user must act: an unbroken tie to settle when executing the issue, a write that failed, a resolved model near retirement. The rest of `resolved_with` stays in the issue.
 
 Done when every issue has its block in the summary.
 
