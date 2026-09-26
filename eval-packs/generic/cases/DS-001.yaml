@@ -1,0 +1,55 @@
+id: DS-001
+suite_version: 2
+case_version: 2
+category: distributed-systems
+difficulty: hard
+roles: [frontier-interactive, frontier-verifier, deep-autonomous]
+
+task: |
+  Implement idempotent event processing with retries and concurrent consumers.
+  The handler below is the current attempt. List what can go wrong, each with a concrete interleaving or failure
+  sequence, then propose the smallest change that keeps every total correct.
+
+context: |
+  A queue delivers each message at least once. A message that is not acknowledged within 30 seconds is delivered again,
+  possibly to another consumer. Two consumer instances run, each processing messages concurrently.
+  Messages: {"message_id": string, "key": string, "amount": integer}. The store is a key-value database with
+  single-key compare-and-set and multi-key transactions.
+
+  on_message(m):
+      total = store.get(m.key)
+      store.put(m.key, total + m.amount)
+      ack(m)
+
+expected_behavior: |
+  The three failure modes with concrete sequences, and a proportionate fix: record message_id atomically
+  with the update, and make the update itself atomic.
+
+must_detect_dimension: edge_case_discovery
+must_detect:
+  - Lost update - two consumers read the same total and one write overwrites the other.
+  - Double application - a crash or failure after put and before ack causes redelivery, and the amount is added again.
+  - Slow processing - a handler that takes more than 30 seconds gets its message redelivered while still running.
+  - The fix records message_id in the same atomic operation as the update, so a redelivery is recognized.
+
+must_not_do:
+  - Claims the queue can provide exactly-once delivery that makes the handler safe as written.
+  - Proposes one global lock for every key without discussing throughput.
+
+must_pass:                        # objective check ids, or invariants judged pass or fail; every repetition
+  - atomic-dedup
+
+objective_checks:
+  - id: interleaving
+    kind: checklist
+    item: Gives a step-by-step interleaving for the lost update.
+  - id: atomic-dedup
+    kind: checklist
+    item: The proposed change makes the idempotency record and the total update commit together.
+
+qualitative_rubric:
+  reasoning_quality: Each failure mode is tied to a delivery guarantee or timing in the context.
+  architectural_judgment: The fix is the smallest one that closes all failure modes, with its trade-offs stated.
+  verification_quality: Explains how to test the fix (forced redelivery, concurrent consumers).
+
+timeout_or_budget: { max_minutes: 10, max_output_tokens: 6000 }

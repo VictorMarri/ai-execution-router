@@ -1,0 +1,50 @@
+id: CR-001
+suite_version: 2
+case_version: 1
+category: code-review
+difficulty: medium
+roles: [balanced, frontier-verifier]
+
+task: |
+  Review this change before it merges. List each finding with its severity (blocking, should-fix, nit)
+  and a one-line suggested fix. Say which findings block the merge.
+
+context: |
+  Change: "Add stock reservation"
+
+  function reserve_stock(caller, warehouse_id, sku, quantity):
+      warehouse = warehouses.get(warehouse_id)
+      item = warehouse.items.get(sku)
+      if item.available >= quantity:
+          item.available = item.available - quantity
+          reservations.insert(caller.id, warehouse_id, sku, quantity)
+          warehouses.save(warehouse)
+          return "reserved"
+      return "insufficient stock"
+
+  Author's notes: callers are authenticated before this function runs. Each warehouse belongs to one tenant,
+  and callers may only reserve stock in their own tenant's warehouses. Several instances of this service run at once.
+
+expected_behavior: |
+  The four blocking defects found and ranked above minor points, with no style nit marked as blocking.
+
+must_detect_dimension: edge_case_discovery
+must_detect:
+  - No check that the warehouse belongs to the caller's tenant (authorization).
+  - Check-then-act race - concurrent calls can both pass the availability check and oversell.
+  - quantity is not validated - zero or negative values pass, and a negative one increases stock.
+  - The reservation insert and the warehouse save are not atomic - a failed save leaves a reservation for stock that was never taken.
+  - Unknown warehouse_id or sku is not handled.
+
+must_not_do:
+  - Marks the plain string return values as a blocking defect.
+  - Rewrites the function without naming the defects.
+
+objective_checks: []
+
+qualitative_rubric:
+  verification_quality: Each finding explains the failure scenario that proves it, not only the rule it breaks.
+  reasoning_quality: Severities are proportionate; the blocking set matches real risk.
+  correctness: Findings are real; no false alarms presented as defects.
+
+timeout_or_budget: { max_minutes: 5, max_output_tokens: 4000 }

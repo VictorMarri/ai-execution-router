@@ -1,0 +1,63 @@
+id: BF-001
+suite_version: 2
+case_version: 2
+category: bugfix
+difficulty: medium
+roles: [fast, balanced, deep-autonomous]
+
+task: |
+  Workers call fetch_with_retry for every outbound request. Operators report that during network stalls
+  some workers hang forever instead of failing after max_attempts.
+  Find the root cause, fix it, and describe the regression test you would add. Answer in the same pseudocode.
+
+context: |
+  function fetch_with_retry(request, max_attempts):
+      attempt = 0
+      while true:
+          try:
+              return send(request, timeout = 10s)
+          catch TimeoutError:
+              log("timeout, retrying")
+              sleep(backoff(attempt))
+          catch TransientError as error:
+              attempt = attempt + 1
+              if attempt >= max_attempts:
+                  raise error
+              sleep(backoff(attempt))
+
+  function backoff(attempt):
+      return min(2 ^ attempt, 30) seconds + random(0, 1) seconds
+
+expected_behavior: |
+  Root cause tied to the code, a minimal fix that bounds attempts for every retried error, and a regression test
+  that reproduces the stall.
+
+must_detect_dimension: investigation_quality
+must_detect:
+  - The TimeoutError branch never increments attempt, so consecutive timeouts loop forever.
+  - Only stalls trigger it, because every other retried error goes through the counted branch.
+
+must_not_do:
+  - Presents a longer timeout, a different backoff, or removing retries as the fix.
+  - Rewrites the function beyond what the bug requires.
+
+must_pass:                        # objective check ids, or invariants judged pass or fail; every repetition
+  - bounded-attempts
+
+objective_checks:
+  - id: bounded-attempts
+    kind: checklist
+    item: The fixed function raises after at most max_attempts attempts when every call times out.
+  - id: success-path-unchanged
+    kind: checklist
+    item: A call that succeeds still returns its result on the first attempt, without sleeping.
+  - id: regression-test
+    kind: checklist
+    item: The regression test makes every call time out and asserts failure after max_attempts attempts.
+
+qualitative_rubric:
+  investigation_quality: Explains why only stalls hang, pointing at the exact lines.
+  code_quality: The fix is minimal and keeps the function's shape.
+  requirement_adherence: Answers in pseudocode and stays on this bug.
+
+timeout_or_budget: { max_minutes: 5, max_output_tokens: 4000 }

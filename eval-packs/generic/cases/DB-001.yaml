@@ -1,0 +1,60 @@
+id: DB-001
+suite_version: 2
+case_version: 1
+category: database-reasoning
+difficulty: medium
+roles: [fast, balanced]
+
+task: |
+  The query below should return, for each customer, their latest order that is not cancelled.
+  Orders with a NULL status count as not cancelled. Return one row per customer; when two qualifying orders
+  share created_at, the higher id wins. Customers with no qualifying order are left out.
+
+  1. List the exact rows (customer_id, id) the query returns on this data.
+  2. Name every way it departs from the intent.
+  3. Write a corrected query in standard SQL.
+
+context: |
+  CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id TEXT, status TEXT, created_at TEXT);
+  INSERT INTO orders VALUES
+    (1, 'c1', 'paid',      '2026-01-01 10:00'),
+    (2, 'c1', 'paid',      '2026-01-02 09:00'),
+    (3, 'c2', NULL,        '2026-01-03 12:00'),
+    (4, 'c2', 'cancelled', '2026-01-04 08:00'),
+    (5, 'c3', 'paid',      '2026-01-05 11:00'),
+    (6, 'c3', 'refunded',  '2026-01-05 11:00');
+
+  SELECT o.customer_id, o.id
+  FROM orders o
+  WHERE o.status <> 'cancelled'
+    AND o.created_at = (SELECT MAX(i.created_at) FROM orders i WHERE i.customer_id = o.customer_id)
+  ORDER BY o.customer_id, o.id;
+
+expected_behavior: |
+  The exact current result, the three defects, and a corrected query that returns c1->2, c2->3, c3->6.
+
+must_detect_dimension: edge_case_discovery
+must_detect:
+  - status <> 'cancelled' is unknown for NULL, so order 3 is dropped.
+  - The subquery takes MAX over cancelled orders too, so a customer whose newest order is cancelled loses their qualifying order.
+  - Ties on created_at return two rows for c3.
+
+must_not_do:
+  - Relies on a vendor-specific feature without saying so.
+
+objective_checks:
+  - id: current-result
+    kind: checklist
+    item: States that the query returns exactly (c1, 2), (c3, 5), (c3, 6).
+  - id: corrected-result
+    kind: sql-result
+    setup: context                       # run the CREATE and INSERT statements from the context
+    query_from: candidate                # the candidate's corrected query
+    expected_rows: [["c1", 2], ["c2", 3], ["c3", 6]]
+    ordered: false
+
+qualitative_rubric:
+  reasoning_quality: Explains each defect through three-valued logic and the data, not by rewriting blindly.
+  code_quality: The corrected query is readable and portable.
+
+timeout_or_budget: { max_minutes: 5, max_output_tokens: 4000 }

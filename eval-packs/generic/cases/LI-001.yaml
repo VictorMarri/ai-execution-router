@@ -1,0 +1,77 @@
+id: LI-001
+suite_version: 2
+case_version: 1
+category: long-horizon-investigation
+difficulty: hard
+roles: [deep-autonomous]
+
+task: |
+  Investigate why messages occasionally reach a dead-letter queue after apparent successful processing.
+  Work from the artifacts below. State your hypotheses, the evidence for and against each, the root cause,
+  and the fix. Cite the log lines you rely on.
+
+context: |
+  Queue configuration:
+    visibility_timeout: 30s        # an unacknowledged message is delivered again after this
+    max_deliveries: 3              # after 3 deliveries without a successful ack, the message moves to the dead-letter queue
+  Consumers: 8 instances.
+
+  Handler:
+    process(m):
+        begin transaction
+        insert into processed_ids (id) values (m.id)     # unique key
+        update stock_levels set qty = qty + m.delta where sku = m.sku
+        commit
+        try:
+            ack(m)
+        catch AckError as e:
+            log.warn("ack failed", m.id, e)
+    on error: log.error(...); nack(m)
+
+  Log excerpt:
+    10:00:00.000 consumer-3 received msg=7f2 delivery=1
+    10:00:00.120 consumer-3 begin tx msg=7f2
+    10:00:02.500 WARN db pool utilization 91%
+    10:00:05.000 consumer-2 received msg=7f3 delivery=1
+    10:00:05.900 consumer-2 commit ok msg=7f3 (lock wait 0.2s)
+    10:00:05.910 consumer-2 ack ok msg=7f3
+    10:00:30.010 consumer-5 received msg=7f2 delivery=2
+    10:00:30.050 consumer-5 begin tx msg=7f2
+    10:00:44.870 consumer-3 commit ok msg=7f2 (lock wait 44.1s on stock_levels sku=81)
+    10:00:44.880 consumer-3 WARN ack failed msg=7f2: receipt expired
+    10:00:44.900 consumer-5 ERROR duplicate key processed_ids(7f2)
+    10:00:44.910 consumer-5 nack msg=7f2
+    10:01:15.020 consumer-1 received msg=7f2 delivery=3
+    10:01:15.060 consumer-1 ERROR duplicate key processed_ids(7f2)
+    10:01:15.070 consumer-1 nack msg=7f2
+    10:01:15.080 queue moved msg=7f2 to dead-letter (deliveries=3)
+    10:01:20.000 WARN db pool utilization 88%
+
+expected_behavior: |
+  A hypothesis-driven investigation that rejects the pool warnings as cause, reconstructs the timeline of msg=7f2,
+  and fixes both the redelivery and the handling of already-processed messages.
+
+must_detect_dimension: investigation_quality
+must_detect:
+  - The first delivery took about 45 seconds (lock wait on one hot row), longer than the 30-second visibility timeout, so the message was delivered again while still in flight.
+  - The ack after the successful commit failed because the receipt had expired, and the handler only logged it.
+  - Later deliveries hit the duplicate key on processed_ids and were counted as failures, exhausting max_deliveries.
+  - The fix treats an already-processed message as success and acknowledges it, and keeps the lease alive or bounds processing time (with the lock contention as the underlying cause to address).
+  - The db pool warnings are unrelated - msg=7f3 committed normally in the same period.
+
+must_not_do:
+  - Proposes raising max_deliveries or changing the dead-letter configuration as the fix.
+  - States a root cause without citing the log lines that support it.
+
+objective_checks:
+  - id: timeline
+    kind: checklist
+    item: Reconstructs the msg=7f2 timeline across consumer-3, consumer-5 and consumer-1 in order.
+
+qualitative_rubric:
+  investigation_quality: Hypotheses are explicit, tested against the evidence, and wrong ones are eliminated before concluding.
+  autonomy: Works through the artifacts without asking for information they already contain.
+  correctness: The root cause and fix match the evidence.
+  reasoning_quality: Separates the trigger (slow commit) from the defect (duplicate treated as failure).
+
+timeout_or_budget: { max_minutes: 15, max_output_tokens: 8000 }

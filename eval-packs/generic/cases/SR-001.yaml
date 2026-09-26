@@ -1,0 +1,57 @@
+id: SR-001
+suite_version: 2
+case_version: 2
+category: security-review
+difficulty: medium
+roles: [frontier-verifier]
+
+task: |
+  Security-review this handler. For each vulnerability give the attack input, the impact, and the fix.
+  Rank them by severity.
+
+context: |
+  function download(request):
+      user = session.current_user(request)
+      name = request.query["file"]
+      path = join("/srv/reports", name)
+      data = read_file(path)
+      report = reports.find_by_path(path)
+      if report.owner_id != user.id:
+          return error(403, "Forbidden: " + path)
+      return file_response(data, content_type = request.query["type"])
+
+  Reports are files under /srv/reports; each has a row in the reports table with its owner.
+
+expected_behavior: |
+  Path traversal first, then the authorization flaws, the reflected content type and the information disclosure,
+  each with a concrete attack input and a fix.
+
+must_detect_dimension: edge_case_discovery
+must_detect:
+  - Path traversal - a name such as ../../etc/passwd escapes /srv/reports.
+  - Authorization runs after the file is read, and a path with no row in reports is not covered by the check.
+  - An unauthenticated request (user is null) is not rejected.
+  - The content type comes from the request, so an attacker can serve a file as text/html (stored cross-site scripting).
+  - The 403 message discloses the internal file path.
+
+must_not_do:
+  - Offers only a blocklist of "../" as the traversal fix.
+  - Reports style or naming as security findings.
+
+must_pass:                        # objective check ids, or invariants judged pass or fail; every repetition
+  - authz-before-read
+  - "After the fix, no path outside /srv/reports can be read."
+
+objective_checks:
+  - id: traversal-attack
+    kind: checklist
+    item: Gives a concrete traversal input and a fix that resolves the canonical path and checks it stays under the base directory, or looks files up by id.
+  - id: authz-before-read
+    kind: checklist
+    item: The fix authorizes before reading and denies when no report row exists.
+
+qualitative_rubric:
+  reasoning_quality: Severity ranking follows impact and exploitability.
+  verification_quality: Says how to test each fix.
+
+timeout_or_budget: { max_minutes: 5, max_output_tokens: 4000 }

@@ -1,0 +1,41 @@
+id: AR-001
+suite_version: 2
+case_version: 1
+category: architecture
+difficulty: medium
+roles: [frontier-interactive]
+
+task: |
+  Propose a change to the design below, with its trade-offs. Keep it proportionate to the problem.
+
+context: |
+  A single application handles sign-up. Inside one database transaction it creates the account, then calls an external
+  email service to send the welcome email, then commits.
+  Two complaints:
+  1. When the email service is slow or down, sign-ups fail or time out.
+  2. Some people receive a welcome email for an account that does not exist, because the transaction later rolled back.
+  About 2,000 sign-ups a day. One team maintains the application.
+
+expected_behavior: |
+  Email sending moves out of the transaction; the intent to send is recorded in the same transaction as the account
+  (an outbox or equivalent) and delivered afterwards with retries, idempotently; trade-offs stated.
+
+must_detect_dimension: architectural_judgment
+must_detect:
+  - Sending must happen only after the account is committed, which removes emails for rolled-back sign-ups.
+  - The intent to send is recorded atomically with the account (outbox or equivalent), so no email is lost if the process stops after commit.
+  - Delivery retries need idempotency, so a retry does not send the email twice.
+  - Failed sends need visibility (monitoring, a failure queue or status).
+  - The trade-off - the welcome email becomes eventually delivered rather than immediate.
+
+must_not_do:
+  - Proposes splitting the application into separate services as the fix.
+  - Keeps the email call inside the transaction.
+
+objective_checks: []
+
+qualitative_rubric:
+  architectural_judgment: Boundaries and responsibilities are clear; the size of the change fits one team and 2,000 sign-ups a day.
+  reasoning_quality: Each complaint is traced to its cause and to the part of the proposal that removes it.
+
+timeout_or_budget: { max_minutes: 5, max_output_tokens: 4000 }

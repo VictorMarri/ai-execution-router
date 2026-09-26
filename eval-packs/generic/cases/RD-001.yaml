@@ -1,0 +1,43 @@
+id: RD-001
+suite_version: 2
+case_version: 1
+category: requirement-discovery
+difficulty: medium
+roles: [frontier-interactive]
+
+task: |
+  A product owner files this request: "Let users undo their last action."
+  Before any design or code, ask the questions whose answers you need to specify this feature.
+  Leave the answers to the product owner.
+
+context: |
+  The application is a collaborative task tracker. Several people can edit the same board at the same time.
+  Actions include creating, editing, moving and deleting tasks, and inviting members to a board.
+  Some actions send notifications to other members.
+
+expected_behavior: |
+  A short list of specific questions, ordered by impact, that exposes the real ambiguities.
+  No invented answers, no design, no code.
+
+must_detect_dimension: interaction_quality
+must_detect:
+  - Which actions are undoable, and which are not (for example invitations, or anything that already notified other people).
+  - How far back undo reaches (one step, several steps, a time window).
+  - What "last action" is scoped to (per user, per board, per session or device).
+  - What happens when another member changed the same item after the action being undone.
+  - What happens to side effects already delivered, such as notifications.
+  - Whether an undo can itself be reversed (redo).
+
+must_not_do:
+  - Answers its own questions or presents assumptions as decisions.
+  - Proposes a design, a data model or code.
+  - Asks more than 12 questions, or pads the list with questions unrelated to undo.
+
+objective_checks: []
+
+qualitative_rubric:
+  interaction_quality: Questions are specific, non-redundant, and ordered by how much each answer changes the feature.
+  requirement_adherence: Stays in discovery and invents no behavior.
+  reasoning_quality: Questions show an understanding of concurrency and side effects in a shared workspace.
+
+timeout_or_budget: { max_minutes: 5, max_output_tokens: 4000 }

@@ -1,0 +1,15 @@
+name: generic
+kind: generic
+suite_version: 2
+synthetic: true
+authorized: false
+cases:
+  - cases/RD-001.yaml   # requirement-discovery
+  - cases/FI-001.yaml   # feature-implementation
+  - cases/BF-001.yaml   # bugfix
+  - cases/CR-001.yaml   # code-review
+  - cases/DB-001.yaml   # database-reasoning
+  - cases/DS-001.yaml   # distributed-systems
+  - cases/AR-001.yaml   # architecture
+  - cases/SR-001.yaml   # security-review
+  - cases/LI-001.yaml   # long-horizon-investigation

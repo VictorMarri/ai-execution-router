@@ -1,0 +1,130 @@
+# Model registry. Schema and refresh: ../REGISTRY.md. Roles and picking: ../RESOLVER.md.
+# Capabilities below are graded from each provider's official positioning of the model,
+# not from benchmarks; every role mapping is unevaluated until an evaluation tests it.
+
+version: 1
+generated_at: 2026-09-26T16:56:33Z
+max_age_days: 7
+watch:
+  window_days: 60
+  max_age_days: 1
+evaluation:
+  role_bar: 0.7
+  evidence_max_age_days: 90
+  queue:
+    - { role: balanced, candidates: [anthropic/claude-sonnet-5, openai/gpt-6-sol], reason: unbroken-tie, queued_at: 2026-09-26 }
+    - { role: frontier-verifier, candidates: [openai/gpt-6-astra, anthropic/claude-fable-5-1], reason: unbroken-tie, queued_at: 2026-09-26 }
+    - { role: deep-autonomous, candidates: [anthropic/claude-fable-5-1, openai/gpt-6-astra], reason: unbroken-tie, queued_at: 2026-09-26 }
+  pending_promotions: []
+diversity_bonus: { status: unmeasured, confidence: , evaluated_at: }
+
+providers:
+
+  anthropic:
+    key_env: ANTHROPIC_API_KEY
+    sources:
+      models_api: https://api.anthropic.com/v1/models
+      models_doc: https://platform.claude.com/docs/en/about-claude/models/overview
+      deprecations_doc: https://platform.claude.com/docs/en/about-claude/model-deprecations
+      effort_doc: https://platform.claude.com/docs/en/build-with-claude/effort
+    models:
+      claude-fable-5-1:             # "demanding reasoning and long-horizon agentic work"
+        lifecycle: { status: active, deprecated_at: , retirement_at: , retirement_not_before: 2027-09-01, replacement: }
+        lifecycle_watch: false
+        capabilities: { reasoning: high, coding: high, agentic: high, interaction: medium, verification: high, autonomy: high, long_context: high }
+        supported_effort: { low: low, medium: medium, high: high, max: max }
+        relative_cost: 50
+        speed: { latency_p50_s: , source: }
+        evidence: [official-docs]
+      claude-opus-5-5:              # "long-running agentic coding and knowledge work"; the provider's default pick
+        lifecycle: { status: active, deprecated_at: , retirement_at: , retirement_not_before: 2027-09-22, replacement: }
+        lifecycle_watch: false
+        capabilities: { reasoning: high, coding: high, agentic: high, interaction: high, verification: high, autonomy: high, long_context: high }
+        supported_effort: { low: low, medium: medium, high: high, max: max }
+        relative_cost: 20
+        speed: { latency_p50_s: , source: }
+        evidence: [official-docs]
+      claude-sonnet-5:              # "the best combination of speed and intelligence"
+        lifecycle: { status: active, deprecated_at: , retirement_at: , retirement_not_before: 2027-06-30, replacement: }
+        lifecycle_watch: false
+        capabilities: { reasoning: medium, coding: high, agentic: high, interaction: high, verification: medium, autonomy: medium, long_context: high }
+        supported_effort: { low: low, medium: medium, high: high, max: max }
+        relative_cost: 10
+        speed: { latency_p50_s: , source: }
+        evidence: [official-docs]
+      claude-haiku-4-5-20251001:    # "the fastest model with near-frontier intelligence"; no effort parameter
+        lifecycle: { status: active, deprecated_at: , retirement_at: , retirement_not_before: 2026-10-15, replacement: }
+        lifecycle_watch: true
+        capabilities: { reasoning: low, coding: medium, agentic: medium, interaction: high, verification: low, autonomy: low, long_context: medium }
+        supported_effort: none
+        relative_cost: 5
+        speed: { latency_p50_s: , source: }
+        evidence: [official-docs]
+
+  openai:
+    key_env: OPENAI_API_KEY
+    sources:
+      models_api: https://api.openai.com/v1/models
+      models_doc: https://developers.openai.com/api/docs/models
+      deprecations_doc: https://developers.openai.com/api/docs/deprecations
+    models:
+      gpt-6-astra:                  # "our most capable model, built for the hardest end-to-end work"
+        lifecycle: { status: active, deprecated_at: , retirement_at: , retirement_not_before: , replacement: }
+        lifecycle_watch: false
+        capabilities: { reasoning: high, coding: high, agentic: high, interaction: medium, verification: high, autonomy: high, long_context: high }
+        supported_effort: { low: low, medium: medium, high: high, max: max }
+        relative_cost: 50
+        speed: { latency_p50_s: , source: }
+        evidence: [official-docs]
+      gpt-6-sol:                    # "built to power complex coding and agentic workflows"
+        lifecycle: { status: active, deprecated_at: , retirement_at: , retirement_not_before: , replacement: }
+        lifecycle_watch: false
+        capabilities: { reasoning: medium, coding: high, agentic: high, interaction: high, verification: medium, autonomy: medium, long_context: high }
+        supported_effort: { low: low, medium: medium, high: high, max: max }
+        relative_cost: 10
+        speed: { latency_p50_s: , source: }
+        evidence: [official-docs]
+      gpt-6-luna:                   # "our most efficient model for focused, high-volume tasks"
+        lifecycle: { status: active, deprecated_at: , retirement_at: , retirement_not_before: , replacement: }
+        lifecycle_watch: false
+        capabilities: { reasoning: low, coding: medium, agentic: medium, interaction: high, verification: low, autonomy: low, long_context: high }
+        supported_effort: { low: low, medium: medium, high: high, max: max }
+        relative_cost: 0.5
+        speed: { latency_p50_s: , source: }
+        evidence: [official-docs]
+
+roles:
+
+  # Incumbents follow the tie rules in ../RESOLVER.md from the evidence below; null where the evidence ties.
+
+  fast:
+    incumbent: openai/gpt-6-luna      # tied on confidence; lower relative_cost
+    candidates:
+      - { model: anthropic/claude-haiku-4-5-20251001, evaluation_status: unevaluated, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+      - { model: openai/gpt-6-luna, evaluation_status: unevaluated, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+
+  balanced:
+    incumbent: null                   # anthropic/claude-sonnet-5 and openai/gpt-6-sol tie
+    candidates:
+      - { model: anthropic/claude-sonnet-5, evaluation_status: challenger, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+      - { model: openai/gpt-6-sol, evaluation_status: challenger, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+      - { model: anthropic/claude-opus-5-5, evaluation_status: unevaluated, fitness: { global: { source: official-docs, confidence: low }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+
+  frontier-interactive:
+    incumbent: anthropic/claude-opus-5-5   # the only candidate at medium confidence
+    candidates:
+      - { model: anthropic/claude-opus-5-5, evaluation_status: unevaluated, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+      - { model: anthropic/claude-fable-5-1, evaluation_status: unevaluated, fitness: { global: { source: official-docs, confidence: low }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+      - { model: openai/gpt-6-astra, evaluation_status: unevaluated, fitness: { global: { source: official-docs, confidence: low }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+
+  frontier-verifier:
+    incumbent: null                   # openai/gpt-6-astra and anthropic/claude-fable-5-1 tie
+    candidates:
+      - { model: openai/gpt-6-astra, evaluation_status: challenger, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+      - { model: anthropic/claude-fable-5-1, evaluation_status: challenger, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+
+  deep-autonomous:
+    incumbent: null                   # anthropic/claude-fable-5-1 and openai/gpt-6-astra tie
+    candidates:
+      - { model: anthropic/claude-fable-5-1, evaluation_status: challenger, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }
+      - { model: openai/gpt-6-astra, evaluation_status: challenger, fitness: { global: { source: official-docs, confidence: medium }, category_specific: {}, optional_specialization: {} }, user_preference: null }

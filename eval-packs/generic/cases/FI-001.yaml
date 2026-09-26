@@ -1,0 +1,92 @@
+id: FI-001
+suite_version: 2
+case_version: 2
+category: feature-implementation
+difficulty: medium
+roles: [fast, balanced]
+
+task: |
+  Write a program, in any language the runner offers, that reads inventory events from standard input
+  (one JSON object per line) and writes one JSON object to standard output. Say how to run it.
+
+  Event: {"event_id": string, "sku": string, "delta": integer, "seq": integer}
+
+  Rules:
+  1. Deliveries can repeat. Each event_id is processed once: its first delivery, in input order, is authoritative,
+     whether it ends applied or rejected.
+  2. A later delivery of the same event_id with a different sku, delta or seq is a conflict: it is not processed,
+     and its event_id is listed in "conflicts".
+  3. The authoritative events of one sku are processed in ascending seq order, whatever order they arrived in.
+     seq values can have gaps.
+  4. A count starts at 0 and never goes below 0. An event that would make it negative is not applied,
+     and its event_id is listed in "rejected".
+
+  Output: {"counts": {sku: integer}, "rejected": [event_id], "conflicts": [event_id]}
+  "counts" holds every sku that appears in an authoritative delivery. Both lists are sorted in ascending
+  string order and name each event_id once.
+
+  Example input:
+  {"event_id": "a1", "sku": "X", "delta": 2, "seq": 1}
+  {"event_id": "a1", "sku": "X", "delta": 2, "seq": 1}
+  Example output:
+  {"counts": {"X": 2}, "rejected": [], "conflicts": []}
+
+context: |
+  No existing code. The runner feeds the program several inputs on standard input and compares the parsed JSON output.
+
+expected_behavior: |
+  A small, readable program that follows all four rules, with a note on how it was checked
+  and on the situations the rules leave open.
+
+must_detect_dimension: edge_case_discovery
+must_detect:
+  - Names situations the rules leave open (for example two different event_ids with the same sku and seq, malformed lines, non-integer delta) and states how the program handles them.
+
+must_not_do:
+  - Applies events in arrival order instead of seq order.
+  - Lets a redelivery of a rejected event be applied later.
+
+must_pass:                        # objective check ids, or invariants judged pass or fail; every repetition
+  - io-mixed
+  - io-reject-then-continue
+
+objective_checks:
+  - id: io-mixed
+    kind: io
+    stdin: |
+      {"event_id": "e3", "sku": "A", "delta": -2, "seq": 2}
+      {"event_id": "e1", "sku": "A", "delta": 5, "seq": 1}
+      {"event_id": "e2", "sku": "B", "delta": 1, "seq": 1}
+      {"event_id": "e3", "sku": "A", "delta": -2, "seq": 2}
+      {"event_id": "e4", "sku": "B", "delta": -3, "seq": 2}
+      {"event_id": "e5", "sku": "A", "delta": 1, "seq": 3}
+      {"event_id": "e5", "sku": "A", "delta": 4, "seq": 3}
+    expected_stdout_json: {"counts": {"A": 4, "B": 1}, "rejected": ["e4"], "conflicts": ["e5"]}
+  - id: io-empty
+    kind: io
+    stdin: ""
+    expected_stdout_json: {"counts": {}, "rejected": [], "conflicts": []}
+  - id: io-reject-then-continue
+    kind: io
+    stdin: |
+      {"event_id": "e10", "sku": "C", "delta": 3, "seq": 2}
+      {"event_id": "e9", "sku": "C", "delta": 2, "seq": 1}
+      {"event_id": "e9", "sku": "C", "delta": 2, "seq": 1}
+      {"event_id": "e11", "sku": "C", "delta": -6, "seq": 3}
+      {"event_id": "e12", "sku": "C", "delta": -5, "seq": 4}
+      {"event_id": "e10", "sku": "C", "delta": 4, "seq": 2}
+    expected_stdout_json: {"counts": {"C": 0}, "rejected": ["e11"], "conflicts": ["e10"]}
+  - id: io-conflict-other-sku
+    kind: io
+    stdin: |
+      {"event_id": "e20", "sku": "D", "delta": 1, "seq": 1}
+      {"event_id": "e20", "sku": "E", "delta": 5, "seq": 1}
+    expected_stdout_json: {"counts": {"D": 1}, "rejected": [], "conflicts": ["e20"]}
+
+qualitative_rubric:
+  code_quality: Clear structure, obvious data flow, no needless abstraction; idiomatic for the language it chose.
+  verification_quality: Checks its own program against each rule, including conflicts, rejections and out-of-order input.
+  verification_efficiency: Self-checks are proportionate to a small program.
+  requirement_adherence: Implements the rules as written, without extra behavior.
+
+timeout_or_budget: { max_minutes: 10, max_output_tokens: 8000 }

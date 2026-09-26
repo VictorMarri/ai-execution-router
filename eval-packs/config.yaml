@@ -1,0 +1,67 @@
+# Evaluator limits and policy. Procedure: ../EVALUATOR.md. Every threshold the evaluator applies lives here.
+
+budget:
+  max_usd_per_run: 25
+  max_cases_per_run: 12
+  max_configs_per_candidate: 3
+  repeats: 3
+
+judges:
+  # <provider>/<model-id>. Empty: the resolver's frontier-verifier pick among models not under test. Fixed per comparison.
+  models: []
+  template_version: 1
+  # Categories that always get a second judge. Empty: a second judge only for close decisions.
+  second_judge_categories: []
+
+# Raw outputs kept under results/<run-id>/raw/, named by SHA-256; hashes are always recorded.
+# synthetic-only: keep raw outputs of cases from synthetic packs only | always | never
+keep_raw_outputs: synthetic-only
+
+# A model cannot compensate for failure in a critical capability by scoring highly on unrelated dimensions.
+# Each dimension must average at least `min` over the role's cases; every case's must_pass must hold too.
+role_requirements:
+  fast:
+    hard_gates: { correctness: { min: 0.80 }, requirement_adherence: { min: 0.80 } }
+  balanced:
+    hard_gates: { correctness: { min: 0.80 }, requirement_adherence: { min: 0.80 } }
+  frontier-interactive:
+    hard_gates: { interaction_quality: { min: 0.75 }, requirement_adherence: { min: 0.80 } }
+  frontier-verifier:
+    hard_gates: { correctness: { min: 0.80 }, verification_quality: { min: 0.80 }, edge_case_discovery: { min: 0.75 } }
+  deep-autonomous:
+    hard_gates: { investigation_quality: { min: 0.75 }, correctness: { min: 0.80 } }
+
+# The highest level whose thresholds all hold; low otherwise.
+confidence:
+  high:
+    min_cases: 6
+    min_repetitions: 3
+    min_categories: 2
+    min_deterministic_case_share: 0.5   # share of cases with an executed io or sql-result check
+    max_spread: 0.15                    # largest per-case score spread across repetitions
+  medium:
+    min_cases: 3
+    min_repetitions: 2
+    min_categories: 1
+    min_deterministic_case_share: 0.0
+    max_spread: 0.30
+  cap_at_medium: [self-judged, partial-blinding, judge-disagreement]
+  judge_disagreement_rate: 0.20
+
+promotion:
+  min_shared_cases: 3
+  consistency_share: 0.67       # share of shared cases where the challenger scores at least as high
+  max_dimension_drop: 0.10
+  min_gain: 0.05                # role score gain for a relevant win
+  tie_band: 0.02                # scores this close count as equal for cost and latency wins
+  min_savings: 0.30             # cost or latency reduction for a win inside the tie band
+  auto:
+    min_confidence: high
+    min_gain: 0.08
+    min_savings: 0.40
+
+privacy:
+  # Providers cases may be sent to. Empty: ask before sending any case to a provider.
+  allowed_providers: []
+  # Only packs carrying one of these flags leave the machine.
+  send_only: [synthetic, authorized]
