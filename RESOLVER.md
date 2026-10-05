@@ -27,7 +27,7 @@ A model listed under a role is claimed fit for it. `evaluated` means a benchmark
 
 `confidence` grades each claim:
 
-- **low**: rests on the model's presence, its name, third-party information, or a refresh placing it automatically.
+- **low**: rests on the model's presence, its name, third-party information, or a refresh placing it without official positioning.
 - **medium**: official docs position the model for this kind of work.
 - **high**: a benchmark or eval pack confirms it; `evaluated` only.
 
